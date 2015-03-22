@@ -1,21 +1,6 @@
-/*
-PWM LED Light
-
-Copyright (C) 2010 Christian Helm
-
-This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 3 of the License, or (at your option) any later version.
-
-This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License along with this program; if not, see <http://www.gnu.org/licenses/>
-*/
-
-
 
 #define XTAL		16e6
 #define F_CPU		16000000UL
-
-
 
 
 #include <avr/io.h>
@@ -62,7 +47,7 @@ const uint8_t encoderTicksPerMovement = 4;
 const uint8_t ledCount = 10;
 
 
-// Logarithmic brightness 
+// Logarithmic brightness
 const uint16_t pwmtable[40] PROGMEM =
 {
 	/* calculated in open office:
@@ -78,15 +63,15 @@ const uint16_t pwmtable[40] PROGMEM =
 
 uint8_t limitValue(uint8_t val)
 {
-		if(val > 200) // Underflow detection
-		{
-			val = 0;
-		}
-		if(val > ledCount * encoderTicksPerLed) // Limit maximum
-		{
-			val = ledCount * encoderTicksPerLed;
-		}
-		return val;
+	if(val > 200) // Underflow detection
+	{
+		val = 0;
+	}
+	if(val > ledCount * encoderTicksPerLed) // Limit maximum
+	{
+		val = ledCount * encoderTicksPerLed;
+	}
+	return val;
 }
 
 uint8_t transformToOutputValue(uint8_t input)
@@ -202,8 +187,8 @@ int main(void)
 
 
 	//uart_init();
-	for(;;){
-		
+	for(;;)
+	{
 		
 	}
 
@@ -211,17 +196,20 @@ int main(void)
 }
 
 
-ISR(TIMER1_OVF_vect){ //READ INPUT  //Set signal leds
+ISR(TIMER1_OVF_vect)
+{ //READ INPUT  //Set signal leds
 
-cli();
+	cli();
 	
-	if ( taster() ) {
+	if ( taster() ) 
+	{
 		activechannel++;
 		if (activechannel == 2)
 		activechannel = 0;
 	}
 	
-	switch(activechannel){
+	switch(activechannel)
+	{
 		case 0:
 		level0 += (encode_read1());
 		level0 = limitValue(level0);
@@ -237,7 +225,8 @@ cli();
 		break;
 	}
 
-	switch(sigleds){
+	switch(sigleds)
+	{
 
 		case 0: PORTD &= ~((1 << PD4) | (1 << PD5) | (1 << PD6) | (1 << PD7)); PORTC &= 0x03; break;
 		case 1: PORTD |= (1 << PD4); PORTD &= ~((1 << PD5) | (1 << PD6) | (1 << PD7)); PORTC &= 0x03; break;
@@ -255,7 +244,8 @@ cli();
 
 }
 
-ISR(TIMER2_OVF_vect){  //SOFTWARE PWM
+ISR(TIMER2_OVF_vect)
+{  //SOFTWARE PWM
 
 	//Read Encoder
 	int8_t new, diff;
@@ -267,50 +257,60 @@ ISR(TIMER2_OVF_vect){  //SOFTWARE PWM
 	if( PHASE_B )
 	new ^= 1;					// convert gray to binary
 	diff = last - new;				// difference last - new
-	if( diff & 1 ){				// bit 0 = value (1)
+	if( diff & 1 )
+	{				// bit 0 = value (1)
 		last = new;					// store new as next last
 		enc_delta += (diff & 2) - 1;		// bit 1 = direction (+/-)
 	}
 	sei();
 
-cli();
-if(channel0limit != 0){
-	if(channel0state == 0 && channel0 == (MAX_PWM - channel0limit)){
+	cli();
+	if(channel0limit != 0)
+	{
+		if(channel0state == 0 && channel0 == (MAX_PWM - channel0limit))
+		{
+			channel0 = 0;
+			channel0state = 1;
+			PORTB &= ~( 1<< PB0); // einschalten !pfets!
+		}
+		if(channel0state == 1 && channel0 == channel0limit)
+		{
+			channel0 = 0;
+			channel0state = 0;
+			PORTB |= (1 << PB0); // ausschalten
+		}
+	}
+
+	if(channel1limit != 0)
+	{
+		if(channel1state == 0 && channel1 == (MAX_PWM - channel1limit))
+		{
+			channel1 = 0;
+			channel1state = 1;
+			PORTB &= ~( 1<< PB1); // einschalten !pfets!
+		}
+		if(channel1state == 1 && channel1 == channel1limit)
+		{
+			channel1 = 0;
+			channel1state = 0;
+			PORTB |= (1 << PB1); // ausschalten
+		}
+	}
+
+	channel0++;
+	channel1++;
+
+
+	if(channel0 > MAX_PWM)
+	{
 		channel0 = 0;
-		channel0state = 1;
-		PORTB &= ~( 1<< PB0); // einschalten !pfets!
 	}
-	if(channel0state == 1 && channel0 == channel0limit){
-		channel0 = 0;
-		channel0state = 0;
-		PORTB |= (1 << PB0); // ausschalten
-	}
-}
-
-if(channel1limit != 0){
-	if(channel1state == 0 && channel1 == (MAX_PWM - channel1limit)){
+	if(channel1 > MAX_PWM)
+	{
 		channel1 = 0;
-		channel1state = 1;
-		PORTB &= ~( 1<< PB1); // einschalten !pfets!
 	}
-	if(channel1state == 1 && channel1 == channel1limit){
-		channel1 = 0;
-		channel1state = 0;
-		PORTB |= (1 << PB1); // ausschalten
-	}
-}
 
-channel0++;
-channel1++;
-
-
-if(channel0 > MAX_PWM){
-	channel0 = 0;
-}
-if(channel1 > MAX_PWM){
-	channel1 = 0;
-}
-sei();
+	sei();
 
 }
 
