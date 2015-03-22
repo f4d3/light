@@ -203,45 +203,7 @@ int main(void)
 
 	//uart_init();
 	for(;;){
-		cli();
-		if(channel0limit != 0){
-			if(channel0state == 0 && channel0 == (MAX_PWM - channel0limit)){
-				channel0 = 0;
-				channel0state = 1;
-				PORTB &= ~( 1<< PB0); // einschalten !pfets!
-			}
-			if(channel0state == 1 && channel0 == channel0limit){
-				channel0 = 0;
-				channel0state = 0;
-				PORTB |= (1 << PB0); // ausschalten
-			}
-		}
-
-		if(channel1limit != 0){
-			if(channel1state == 0 && channel1 == (MAX_PWM - channel1limit)){
-				channel1 = 0;
-				channel1state = 1;
-				PORTB &= ~( 1<< PB1); // einschalten !pfets!
-			}
-			if(channel1state == 1 && channel1 == channel1limit){
-				channel1 = 0;
-				channel1state = 0;
-				PORTB |= (1 << PB1); // ausschalten
-			}
-		}
 		
-		channel0++;
-		channel1++;
-
-		
-		if(channel0 > MAX_PWM){
-			channel0 = 0;
-		}
-		if(channel1 > MAX_PWM){
-			channel1 = 0;
-		}
-
-		sei();
 		
 	}
 
@@ -251,7 +213,7 @@ int main(void)
 
 ISR(TIMER1_OVF_vect){ //READ INPUT  //Set signal leds
 
-
+cli();
 	
 	if ( taster() ) {
 		activechannel++;
@@ -289,6 +251,7 @@ ISR(TIMER1_OVF_vect){ //READ INPUT  //Set signal leds
 		case 9: PORTD |= (1 << PD4) | (1 << PD5) | (1 << PD6) | (1 << PD7); PORTC |= (1<<PC2) | (1<<PC3) | (1<<PC4) | (1<<PC5) | (1<<PC6); PORTC &= ~(1<<PC7); break;
 		case 10: PORTD |= (1 << PD4) | (1 << PD5) | (1 << PD6) | (1 << PD7); PORTC |= (1<<PC2) | (1<<PC3) | (1<<PC4) | (1<<PC5) | (1<<PC6) | (1<<PC7); break;
 	}
+	sei();
 
 }
 
@@ -309,6 +272,45 @@ ISR(TIMER2_OVF_vect){  //SOFTWARE PWM
 		enc_delta += (diff & 2) - 1;		// bit 1 = direction (+/-)
 	}
 	sei();
+
+cli();
+if(channel0limit != 0){
+	if(channel0state == 0 && channel0 == (MAX_PWM - channel0limit)){
+		channel0 = 0;
+		channel0state = 1;
+		PORTB &= ~( 1<< PB0); // einschalten !pfets!
+	}
+	if(channel0state == 1 && channel0 == channel0limit){
+		channel0 = 0;
+		channel0state = 0;
+		PORTB |= (1 << PB0); // ausschalten
+	}
+}
+
+if(channel1limit != 0){
+	if(channel1state == 0 && channel1 == (MAX_PWM - channel1limit)){
+		channel1 = 0;
+		channel1state = 1;
+		PORTB &= ~( 1<< PB1); // einschalten !pfets!
+	}
+	if(channel1state == 1 && channel1 == channel1limit){
+		channel1 = 0;
+		channel1state = 0;
+		PORTB |= (1 << PB1); // ausschalten
+	}
+}
+
+channel0++;
+channel1++;
+
+
+if(channel0 > MAX_PWM){
+	channel0 = 0;
+}
+if(channel1 > MAX_PWM){
+	channel1 = 0;
+}
+sei();
 
 }
 
