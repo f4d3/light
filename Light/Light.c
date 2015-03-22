@@ -78,7 +78,7 @@ const uint16_t pwmtable[40] PROGMEM =
 
 uint8_t limitValue(uint8_t val)
 {
-		if(val > 210) // Underflow detection
+		if(val > 200) // Underflow detection
 		{
 			val = 0;
 		}
