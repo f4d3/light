@@ -28,23 +28,14 @@ You should have received a copy of the GNU General Public License along with thi
 //current pwm value:
 volatile uint16_t channel0 = 0;
 volatile uint16_t channel1 = 0;
-volatile uint16_t channel2 = 0;
-volatile uint16_t channel3 = 0;
-volatile uint16_t channel4 = 0;
 
 //max pwm value
 volatile uint16_t channel0limit = 0;
 volatile uint16_t channel1limit = 0;
-volatile uint16_t channel2limit = 0; //red
-volatile uint16_t channel3limit = 0;//green
-volatile uint16_t channel4limit = 0;//blue
 
 //pwm status
 volatile uint8_t channel0state = 0;
 volatile uint8_t channel1state = 0;
-volatile uint8_t channel2state = 0;
-volatile uint8_t channel3state = 0;
-volatile uint8_t channel4state = 0;
 
 const uint16_t MAX_PWM = 400;
 
@@ -64,9 +55,7 @@ static int8_t last;
 volatile uint8_t sigleds = 0;
 volatile uint8_t level0 = 0;
 volatile uint8_t level1 = 0;
-volatile uint8_t level2 = 0;
-volatile uint8_t level3 = 0;
-volatile uint8_t level4 = 0;
+
 volatile uint8_t activechannel = 0;
 const uint8_t encoderTicksPerLed = 16;
 const uint8_t encoderTicksPerMovement = 4;
@@ -240,51 +229,10 @@ int main(void)
 				PORTB |= (1 << PB1); // ausschalten
 			}
 		}
-
-		if(channel2limit != 0){
-			if(channel2state == 0 && channel2 == (MAX_PWM - channel2limit)){
-				channel2 = 0;
-				channel2state = 1;
-				PORTB &= ~( 1<< PB2); // einschalten !pfets!
-			}
-			if(channel2state == 1 && channel2 == channel2limit){
-				channel2 = 0;
-				channel2state = 0;
-				PORTB |= (1 << PB2); // ausschalten
-			}
-		}
-
-		if(channel3limit != 0){
-			if(channel3state == 0 && channel3 == (MAX_PWM - channel3limit)){
-				channel3 = 0;
-				channel3state = 1;
-				PORTB &= ~( 1<< PB3); // einschalten !pfets!
-			}
-			if(channel3state == 1 && channel3 == channel3limit){
-				channel3 = 0;
-				channel3state = 0;
-				PORTB |= (1 << PB3); // ausschalten
-			}
-		}
-
-		if(channel4limit != 0){
-			if(channel4state == 0 && channel4 == (MAX_PWM - channel4limit)){
-				channel4 = 0;
-				channel4state = 1;
-				PORTB &= ~( 1<< PB4); // einschalten !pfets!
-			}
-			if(channel4state == 1 && channel4 == channel4limit){
-				channel4 = 0;
-				channel4state = 0;
-				PORTB |= (1 << PB4); // ausschalten
-			}
-		}
 		
 		channel0++;
 		channel1++;
-		channel2++;
-		channel3++;
-		channel4++;
+
 		
 		if(channel0 > MAX_PWM){
 			channel0 = 0;
@@ -292,15 +240,7 @@ int main(void)
 		if(channel1 > MAX_PWM){
 			channel1 = 0;
 		}
-		if(channel2 > MAX_PWM){
-			channel2 = 0;
-		}
-		if(channel3 > MAX_PWM){
-			channel3 = 0;
-		}
-		if(channel4 > MAX_PWM){
-			channel4 = 0;
-		}
+
 		sei();
 		
 	}
@@ -315,7 +255,7 @@ ISR(TIMER1_OVF_vect){ //READ INPUT  //Set signal leds
 	
 	if ( taster() ) {
 		activechannel++;
-		if (activechannel == 5)
+		if (activechannel == 2)
 		activechannel = 0;
 	}
 	
@@ -332,27 +272,6 @@ ISR(TIMER1_OVF_vect){ //READ INPUT  //Set signal leds
 		level1 = limitValue(level1);
 		sigleds = level1/encoderTicksPerLed;
 		channel1limit = transformToOutputValue(level1);
-		break;
-
-		case 2:
-		level2 += (encode_read1());
-		level2 = limitValue(level2);
-		sigleds = level2/encoderTicksPerLed;
-		channel2limit = transformToOutputValue(level2);
-		break;
-
-		case 3:
-		level3 += (encode_read1());
-		level3 = limitValue(level3);
-		sigleds = level3/encoderTicksPerLed;
-		channel3limit = transformToOutputValue(level3);
-		break;
-
-		case 4:
-		level4 += (encode_read1());
-		level4 = limitValue(level4);
-		sigleds = level4/encoderTicksPerLed;
-		channel4limit = transformToOutputValue(level4);
 		break;
 	}
 
