@@ -8,21 +8,16 @@
 #include <util/delay.h>
 #include <stdlib.h>
 #include <avr/pgmspace.h>
-//#include "cs.h"
 
-//current pwm value:
-volatile uint16_t channel0 = 0;
-volatile uint16_t channel1 = 0;
+
+//previous pwm value:
+volatile uint16_t channel0Prev = 0;
+volatile uint16_t channel1Prev = 0;
 
 //max pwm value
 volatile uint16_t channel0limit = 0;
 volatile uint16_t channel1limit = 0;
 
-//pwm status
-volatile uint8_t channel0state = 0;
-volatile uint8_t channel1state = 0;
-
-const uint16_t MAX_PWM = 400;
 
 #define BAUD        9600UL
 #define UBRR_BAUD   ((F_CPU/(16UL*BAUD))-1)
@@ -56,8 +51,8 @@ const uint16_t pwmtable[40] PROGMEM =
 	B2 = Number of Output Bits. Here max value = 250
 	B1 = Number of Input Values = 40
 	*/
-	0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 18, 19, 20, 21,
-	22, 26, 30, 35, 40, 46, 53, 61, 71, 81, 94, 108, 124, 142, 164, 188, 216, 249
+	0, 1, 2, 3, 4, 5, 6, 7, 10, 13, 18, 24, 32, 42, 56, 74, 97, 127, 167, 220, 288,
+	378, 496, 650, 852, 1117, 1464, 1918, 2513, 3292, 4341, 5650, 7402, 9696, 12702, 16639, 21797, 28554, 37404, 48999
 	
 };
 
@@ -74,7 +69,7 @@ uint8_t limitValue(uint8_t val)
 	return val;
 }
 
-uint8_t transformToOutputValue(uint8_t input)
+uint16_t transformToOutputValue(uint8_t input)
 {
 	input /= encoderTicksPerMovement;
 	if(input < 40)
@@ -83,7 +78,7 @@ uint8_t transformToOutputValue(uint8_t input)
 	}
 	else
 	{
-		return 250;
+		return 48999;
 	}
 }
 
@@ -158,33 +153,36 @@ void uart_init(void)
 int main(void)
 {
 	
-	//all leds off
-	PORTB |= (1 << PB0);
-	PORTB |= (1 << PB1);
-	PORTB |= (1 << PB2);
-	PORTB |= (1 << PB3);
-	PORTB |= (1 << PB4);
-
 	encode_init();
 
 	DDRB |= ( 1 << DDB0) | ( 1 << DDB1 ) | ( 1 << DDB2 ) | ( 1 << DDB3 ) | ( 1 << DDB4 );
-	DDRD |= ( 1 << DDD4) | ( 1 << DDD5) | ( 1 << DDD6) | ( 1 << DDD7);
+	DDRD |= ( 1 << DDD2) | ( 1 << DDD3) | ( 1 << DDD4) | ( 1 << DDD5) | ( 1 << DDD6) | ( 1 << DDD7);
 	DDRC = 0xFF;
-
 	DDRA = 0x00;
+	
+	PORTD |= (1 << PD4); // LED Off
+	PORTD |= (1 << PD5); // LED Off
+	
 	PORTA |= (1<<PA2);
 
-	TCCR2 |= (1 << CS20) ; //prescaler 1
+	TCCR2 |= (1 << CS21) ; //prescaler 8
 	TIMSK |= (1 << TOIE2);// 8bit timer
+	
+	ICR1 = 0xFFFF; // 16 bit PWM
+	OCR1A = 0x000; // Duty Cycle 0
+	OCR1B = 0x000; // Duty Cycle 0
+	TCCR1A &= ~((1 << COM1A1) | (1 << COM1B1) | (1 << COM1A0) | (1 << COM1B0));  // Disable PWM Output
 
-	TCCR1B |= (1 << CS11) ; //precsaler 8
-	TIMSK |= (1 << TOIE1); // 16bit timer
-
-	sei();
-
-	//PORTD |= (1 << PD7);
-
-
+	TCCR1A |= (1 << WGM11);
+	TCCR1B |= (1 << WGM12)|(1 << WGM13);
+	// set Fast PWM mode using ICR1 as TOP
+	
+	TCCR1B |= (1 << CS10);
+	// Start the timer, no prescaler
+	
+	
+	
+	sei(); // Enable interrupts
 
 	//uart_init();
 	for(;;)
@@ -196,18 +194,19 @@ int main(void)
 }
 
 
-ISR(TIMER1_OVF_vect)
-{ //READ INPUT  //Set signal leds
+
+ISR(TIMER2_OVF_vect)
+{  //SOFTWARE PWM
 
 	cli();
-	
-	if ( taster() ) 
+
+	if ( taster() )
 	{
 		activechannel++;
 		if (activechannel == 2)
 		activechannel = 0;
 	}
-	
+
 	switch(activechannel)
 	{
 		case 0:
@@ -228,24 +227,18 @@ ISR(TIMER1_OVF_vect)
 	switch(sigleds)
 	{
 
-		case 0: PORTD &= ~((1 << PD4) | (1 << PD5) | (1 << PD6) | (1 << PD7)); PORTC &= 0x03; break;
-		case 1: PORTD |= (1 << PD4); PORTD &= ~((1 << PD5) | (1 << PD6) | (1 << PD7)); PORTC &= 0x03; break;
-		case 2:	PORTD |= (1 << PD4); PORTD |= (1 << PD5); PORTD &= ~((1 << PD6) | (1 << PD7)); PORTC &= 0x03; break;
-		case 3: PORTD |= (1 << PD4); PORTD |= (1 << PD5); PORTD |= (1 << PD6); PORTD &= ~(1 << PD7); PORTC &= 0x03; break;
-		case 4: PORTD |= (1 << PD4) | (1 << PD5) | (1 << PD6) | (1 << PD7); PORTC &= 0x03; break;
-		case 5: PORTD |= (1 << PD4) | (1 << PD5) | (1 << PD6) | (1 << PD7); PORTC |= (1<<PC2); PORTC &= ~((1<<PC3) | (1<<PC4) | (1<<PC5) | (1<<PC6) | (1<<PC7)); break;
-		case 6: PORTD |= (1 << PD4) | (1 << PD5) | (1 << PD6) | (1 << PD7); PORTC |= (1<<PC2) | (1<<PC3);  PORTC &= ~((1<<PC4) | (1<<PC5) | (1<<PC6) | (1<<PC7)); break;
-		case 7: PORTD |= (1 << PD4) | (1 << PD5) | (1 << PD6) | (1 << PD7); PORTC |= (1<<PC2) | (1<<PC3) | (1<<PC4);  PORTC &= ~((1<<PC5) | (1<<PC6) | (1<<PC7)); break;
-		case 8: PORTD |= (1 << PD4) | (1 << PD5) | (1 << PD6) | (1 << PD7); PORTC |= (1<<PC2) | (1<<PC3) | (1<<PC4) | (1<<PC5); PORTC &= ~((1<<PC6) | (1<<PC7)); break;
-		case 9: PORTD |= (1 << PD4) | (1 << PD5) | (1 << PD6) | (1 << PD7); PORTC |= (1<<PC2) | (1<<PC3) | (1<<PC4) | (1<<PC5) | (1<<PC6); PORTC &= ~(1<<PC7); break;
-		case 10: PORTD |= (1 << PD4) | (1 << PD5) | (1 << PD6) | (1 << PD7); PORTC |= (1<<PC2) | (1<<PC3) | (1<<PC4) | (1<<PC5) | (1<<PC6) | (1<<PC7); break;
+		case 0: PORTD &= ~((1 << PD2) | (1 << PD3) | (1 << PD6) | (1 << PD7)); PORTC &= 0x03; break;
+		case 1: PORTD |= (1 << PD2); PORTD &= ~((1 << PD3) | (1 << PD6) | (1 << PD7)); PORTC &= 0x03; break;
+		case 2:	PORTD |= (1 << PD2); PORTD |= (1 << PD3); PORTD &= ~((1 << PD6) | (1 << PD7)); PORTC &= 0x03; break;
+		case 3: PORTD |= (1 << PD2); PORTD |= (1 << PD3); PORTD |= (1 << PD6); PORTD &= ~(1 << PD7); PORTC &= 0x03; break;
+		case 4: PORTD |= (1 << PD2) | (1 << PD3) | (1 << PD6) | (1 << PD7); PORTC &= 0x03; break;
+		case 5: PORTD |= (1 << PD2) | (1 << PD3) | (1 << PD6) | (1 << PD7); PORTC |= (1<<PC2); PORTC &= ~((1<<PC3) | (1<<PC4) | (1<<PC5) | (1<<PC6) | (1<<PC7)); break;
+		case 6: PORTD |= (1 << PD2) | (1 << PD3) | (1 << PD6) | (1 << PD7); PORTC |= (1<<PC2) | (1<<PC3);  PORTC &= ~((1<<PC4) | (1<<PC5) | (1<<PC6) | (1<<PC7)); break;
+		case 7: PORTD |= (1 << PD2) | (1 << PD3) | (1 << PD6) | (1 << PD7); PORTC |= (1<<PC2) | (1<<PC3) | (1<<PC4);  PORTC &= ~((1<<PC5) | (1<<PC6) | (1<<PC7)); break;
+		case 8: PORTD |= (1 << PD2) | (1 << PD3) | (1 << PD6) | (1 << PD7); PORTC |= (1<<PC2) | (1<<PC3) | (1<<PC4) | (1<<PC5); PORTC &= ~((1<<PC6) | (1<<PC7)); break;
+		case 9: PORTD |= (1 << PD2) | (1 << PD3) | (1 << PD6) | (1 << PD7); PORTC |= (1<<PC2) | (1<<PC3) | (1<<PC4) | (1<<PC5) | (1<<PC6); PORTC &= ~(1<<PC7); break;
+		case 10: PORTD |= (1 << PD2) | (1 << PD3) | (1 << PD6) | (1 << PD7); PORTC |= (1<<PC2) | (1<<PC3) | (1<<PC4) | (1<<PC5) | (1<<PC6) | (1<<PC7); break;
 	}
-	sei();
-
-}
-
-ISR(TIMER2_OVF_vect)
-{  //SOFTWARE PWM
 
 	//Read Encoder
 	int8_t new, diff;
@@ -262,55 +255,55 @@ ISR(TIMER2_OVF_vect)
 		last = new;					// store new as next last
 		enc_delta += (diff & 2) - 1;		// bit 1 = direction (+/-)
 	}
+	
+	
+	if(channel0limit > 0 )
+	{
+		if(channel0Prev == 0)
+		{
+			// Prevents flickering when turning on led
+			TCCR1B &= ~(1 << CS10);
+			TCNT1 = 0xFFFE;
+		}
+		TCCR1A |= (1 << COM1A1) | (1 << COM1A0);
+		OCR1A = channel0limit;
+		if(channel0 == 0)
+		{
+			TCCR1B |= (1 << CS10);
+		}
+	}
+
+	else //channel0limit == 0
+	{
+		OCR1A = 0;
+		TCCR1A &= ~((1 << COM1A1) | (1 << COM1A0));
+		PORTD |= (1 << PD5); // ausschalten
+	}
+	
+	if(channel1limit > 0 )
+	{
+		if(channel1Prev == 0)
+		{
+			TCCR1B &= ~(1 << CS10);
+			TCNT1 = 0xFFFE;
+		}
+		TCCR1A |= (1 << COM1B1) | (1 << COM1B0);
+		OCR1B = channel1limit;
+		if(channel1Prev == 0)
+		{
+			TCCR1B |= (1 << CS10);
+		}
+	}
+	else //channel1limit == 0
+	{
+		OCR1B = 0;
+		TCCR1A &= ~((1 << COM1B1) | (1 << COM1B0));
+		PORTD |= (1 << PD4); // ausschalten
+	}
+	
+	channel0Prev = channel0limit;
+	channel1Prev = channel1limit;
+	
 	sei();
-
-	cli();
-	if(channel0limit != 0)
-	{
-		if(channel0state == 0 && channel0 == (MAX_PWM - channel0limit))
-		{
-			channel0 = 0;
-			channel0state = 1;
-			PORTB &= ~( 1<< PB0); // einschalten !pfets!
-		}
-		if(channel0state == 1 && channel0 == channel0limit)
-		{
-			channel0 = 0;
-			channel0state = 0;
-			PORTB |= (1 << PB0); // ausschalten
-		}
-	}
-
-	if(channel1limit != 0)
-	{
-		if(channel1state == 0 && channel1 == (MAX_PWM - channel1limit))
-		{
-			channel1 = 0;
-			channel1state = 1;
-			PORTB &= ~( 1<< PB1); // einschalten !pfets!
-		}
-		if(channel1state == 1 && channel1 == channel1limit)
-		{
-			channel1 = 0;
-			channel1state = 0;
-			PORTB |= (1 << PB1); // ausschalten
-		}
-	}
-
-	channel0++;
-	channel1++;
-
-
-	if(channel0 > MAX_PWM)
-	{
-		channel0 = 0;
-	}
-	if(channel1 > MAX_PWM)
-	{
-		channel1 = 0;
-	}
-
-	sei();
-
 }
 
