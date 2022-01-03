@@ -1,5 +1,8 @@
 # PWM LED Lamp
 
+A PWM dimmable LED lamp. The brightness is cControlled by a rotary encoder.
+The current brightness is displayed on a red LED circle around the brighness control.
+The software runs on an AVR microcontroller.
 
 ![image004](https://user-images.githubusercontent.com/11595624/147975641-b230d7cc-daaa-404a-8561-9e0e46d5a1c7.jpg)
 ![image009](https://user-images.githubusercontent.com/11595624/147975663-f154521f-7096-4b0c-930a-f087c8c5e0b4.jpg)
